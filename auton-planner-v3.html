@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auton Planner — Syndicate</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d1117; --nav:#111620; --surf:#161c27; --surf2:#1c2333; --surf3:#222a3a;
+  --brd:rgba(255,255,255,0.07); --brd2:rgba(255,255,255,0.13);
+  --cyan:#00d4e8; --cyan-d:rgba(0,212,232,0.15); --cyan-g:rgba(0,212,232,0.07);
+  --red:#ff4d6a; --blue:#3d9fff; --green:#00e5a0; --yellow:#ffd166;
+  --txt:#e2e8f0; --txt2:#8896ab; --txt3:#3d4a5c;
+  --r:10px; --rs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* HEADER */
+header{height:50px;background:var(--nav);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 16px;gap:14px;flex-shrink:0;}
+.hlogo{font-weight:700;font-size:.95rem;color:var(--txt);}
+.hlogo span{color:var(--cyan);}
+.hdiv{width:1px;height:18px;background:var(--brd2);}
+.hsub{font-size:.72rem;color:var(--txt2);}
+.ftoggle{margin-left:auto;display:flex;background:var(--surf2);border-radius:7px;padding:3px;gap:2px;}
+.ftbtn{font-family:'DM Sans',sans-serif;font-size:.7rem;font-weight:500;padding:4px 14px;border-radius:5px;border:none;background:transparent;color:var(--txt2);cursor:pointer;transition:all .15s;}
+.ftbtn.on{background:var(--cyan);color:#0d1117;font-weight:600;}
+
+/* LAYOUT */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* LEFT */
+.lpanel{width:205px;flex-shrink:0;background:var(--nav);border-right:1px solid var(--brd);display:flex;flex-direction:column;}
+.phead{padding:10px 12px 8px;font-size:.6rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3);border-bottom:1px solid var(--brd);}
+.wlist{flex:1;overflow-y:auto;padding:7px;}
+.wlist::-webkit-scrollbar{width:3px;}
+.wlist::-webkit-scrollbar-thumb{background:var(--surf3);}
+
+.wcard{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:7px 9px;margin-bottom:4px;cursor:pointer;transition:all .15s;position:relative;}
+.wcard:hover{border-color:var(--brd2);background:var(--surf3);}
+.wcard.sel{border-color:var(--cyan);background:var(--cyan-g);}
+.wcard.startc{border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.04);}
+.wcard.startc.sel{border-color:var(--green);background:rgba(0,229,160,.09);}
+.wctop{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
+.wbadge{font-size:.58rem;font-weight:600;font-family:'DM Mono',monospace;color:var(--cyan);background:var(--cyan-d);border-radius:3px;padding:1px 5px;flex-shrink:0;}
+.startc .wbadge{color:var(--green);background:rgba(0,229,160,.15);}
+.wcname{font-size:.7rem;font-weight:500;color:var(--txt);}
+.wccoords{font-size:.6rem;color:var(--txt2);font-family:'DM Mono',monospace;}
+.wcact{font-size:.58rem;color:var(--red);margin-top:2px;}
+.wdel{position:absolute;top:6px;right:7px;color:var(--txt3);cursor:pointer;font-size:.72rem;transition:color .15s;}
+.wdel:hover{color:var(--red);}
+
+.lfooter{padding:9px;border-top:1px solid var(--brd);display:flex;flex-direction:column;gap:6px;}
+.btn{font-family:'DM Sans',sans-serif;font-size:.7rem;font-weight:500;padding:7px 11px;border-radius:var(--rs);border:1px solid var(--brd);background:var(--surf2);color:var(--txt2);cursor:pointer;transition:all .15s;text-align:center;}
+.btn:hover{border-color:var(--brd2);color:var(--txt);background:var(--surf3);}
+.btn.cy{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-g);}
+.btn.cy:hover{background:var(--cyan-d);}
+.btn.dng:hover{border-color:var(--red);color:var(--red);}
+.hint{font-size:.6rem;color:var(--txt3);text-align:center;line-height:1.5;}
+
+/* FIELD */
+.ffield{flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg);overflow:hidden;}
+canvas{display:block;cursor:crosshair;}
+
+/* RIGHT */
+.rpanel{width:285px;flex-shrink:0;background:var(--nav);border-left:1px solid var(--brd);display:flex;flex-direction:column;overflow:hidden;}
+.tabs{display:flex;border-bottom:1px solid var(--brd);padding:0 6px;}
+.tab{font-family:'DM Sans',sans-serif;font-size:.7rem;font-weight:500;padding:11px 13px 9px;border:none;background:transparent;color:var(--txt2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+.tab.on{color:var(--cyan);border-bottom-color:var(--cyan);}
+.tbody{display:none;flex:1;overflow-y:auto;flex-direction:column;}
+.tbody.on{display:flex;}
+.tbody::-webkit-scrollbar{width:3px;}
+.tbody::-webkit-scrollbar-thumb{background:var(--surf3);}
+
+/* EDITOR */
+.einner{padding:13px;}
+.etitle{font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);margin-bottom:11px;}
+.etitle.green{color:var(--green);}
+.frow{display:flex;gap:7px;margin-bottom:9px;}
+.fcol{flex:1;}
+.flabel{display:block;font-size:.6rem;font-weight:500;color:var(--txt2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.07em;}
+.finput,.fselect{width:100%;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--txt);font-family:'DM Mono',monospace;font-size:.73rem;padding:6px 8px;outline:none;transition:border-color .15s;}
+.finput:focus,.fselect:focus{border-color:var(--cyan);}
+.fselect option{background:var(--surf2);}
+.metarow{background:var(--surf2);border-radius:var(--rs);padding:7px 10px;margin-bottom:9px;font-size:.67rem;color:var(--txt2);font-family:'DM Mono',monospace;display:flex;gap:12px;}
+.mval{color:var(--cyan);font-weight:500;}
+.slabel{font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);padding:7px 0 5px;border-top:1px solid var(--brd);margin-top:2px;}
+.acard{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:7px 9px;margin-bottom:5px;position:relative;}
+.aname{font-size:.63rem;color:var(--red);font-weight:600;margin-bottom:5px;font-family:'DM Mono',monospace;}
+.adel{position:absolute;top:6px;right:8px;color:var(--txt3);cursor:pointer;font-size:.7rem;transition:color .15s;}
+.adel:hover{color:var(--red);}
+.arow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.arow label{font-size:.6rem;color:var(--txt2);}
+.arow select,.arow input{background:var(--surf);border:1px solid var(--brd);border-radius:4px;color:var(--txt);font-family:'DM Mono',monospace;font-size:.67rem;padding:4px 6px;outline:none;}
+.arow input[type=number]{width:62px;}
+.arow select:focus,.arow input:focus{border-color:var(--cyan);}
+.addrow{display:flex;gap:6px;margin-top:7px;}
+.addrow select{flex:1;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--txt2);font-family:'DM Sans',sans-serif;font-size:.68rem;padding:6px 7px;outline:none;}
+.cbrow{display:flex;align-items:center;gap:7px;margin-bottom:9px;font-size:.68rem;color:var(--txt2);cursor:pointer;}
+.cbrow input{accent-color:var(--cyan);}
+.nosel{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:7px;color:var(--txt3);font-size:.68rem;text-align:center;padding:22px;}
+.nosel-icon{font-size:1.8rem;opacity:.25;}
+
+/* CODE */
+.cwrap{flex:1;display:flex;flex-direction:column;}
+.ctoolbar{display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-bottom:1px solid var(--brd);flex-shrink:0;}
+.cstat{font-size:.63rem;color:var(--txt2);}
+.cout{flex:1;overflow-y:auto;padding:13px;font-family:'DM Mono',monospace;font-size:.68rem;line-height:1.85;white-space:pre;background:var(--bg);color:var(--txt);}
+.cout::-webkit-scrollbar{width:3px;}
+.cout::-webkit-scrollbar-thumb{background:var(--surf3);}
+.ck{color:#c792ea;} .cf{color:var(--cyan);} .cn{color:var(--yellow);} .cc{color:var(--txt3);font-style:italic;} .cm{color:var(--red);}
+
+/* MECHS */
+.mwrap{padding:11px;flex:1;overflow-y:auto;}
+.mwrap::-webkit-scrollbar{width:3px;}
+.mwrap::-webkit-scrollbar-thumb{background:var(--surf3);}
+.mrow{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:6px 9px;margin-bottom:5px;display:flex;align-items:center;gap:7px;}
+.mbadge{font-size:.56rem;font-weight:600;padding:2px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0;}
+.mbadge.piston{background:rgba(255,77,106,.15);color:var(--red);}
+.mbadge.motor{background:var(--cyan-d);color:var(--cyan);}
+.minput{flex:1;background:var(--surf);border:1px solid var(--brd);border-radius:4px;color:var(--txt);font-family:'DM Mono',monospace;font-size:.68rem;padding:4px 7px;outline:none;}
+.minput:focus{border-color:var(--cyan);}
+.mdel{color:var(--txt3);cursor:pointer;font-size:.72rem;transition:color .15s;}
+.mdel:hover{color:var(--red);}
+.madd{margin-top:9px;display:flex;flex-direction:column;gap:5px;}
+.madd select,.madd input{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:.68rem;padding:6px 8px;outline:none;width:100%;}
+.madd select:focus,.madd input:focus{border-color:var(--cyan);}
+.mhint{font-size:.6rem;color:var(--txt3);line-height:1.6;margin-top:9px;padding-top:9px;border-top:1px solid var(--brd);}
+</style>
+</head>
+<body>
+<header>
+  <div class="hlogo">12S — <span>Auton Planner</span></div>
+  <div class="hdiv"></div>
+  <span class="hsub">Push Back 2025–26 · EZ-Template · V5RC</span>
+  <div class="ftoggle">
+    <button class="ftbtn on" onclick="setMode('match')">Match</button>
+    <button class="ftbtn" onclick="setMode('skills')">Skills</button>
+  </div>
+</header>
+<div class="main">
+  <div class="lpanel">
+    <div class="phead">Waypoints</div>
+    <div class="wlist" id="wlist"></div>
+    <div class="lfooter">
+      <div class="btn dng" onclick="clearAll()">Clear Path</div>
+      <div class="hint">Click field to place · Drag to move</div>
+    </div>
+  </div>
+  <div class="ffield"><canvas id="cv"></canvas></div>
+  <div class="rpanel">
+    <div class="tabs">
+      <button class="tab on" onclick="switchTab('editor')">Editor</button>
+      <button class="tab" onclick="switchTab('code')">Code</button>
+      <button class="tab" onclick="switchTab('mechs')">Mechs</button>
+    </div>
+    <div class="tbody on" id="tb-editor"><div id="einner"></div></div>
+    <div class="tbody" id="tb-code">
+      <div class="cwrap">
+        <div class="ctoolbar">
+          <span class="cstat" id="cstat">0 waypoints</span>
+          <button class="btn cy" style="padding:4px 11px;font-size:.63rem" onclick="copyCode()">Copy</button>
+        </div>
+        <div class="cout" id="cout"></div>
+      </div>
+    </div>
+    <div class="tbody" id="tb-mechs">
+      <div class="mwrap">
+        <div class="phead" style="padding:0 0 9px;border:none">Mechanisms</div>
+        <div id="mlist"></div>
+        <div class="madd">
+          <select id="nmtype"><option value="piston">Piston (true/false)</option><option value="motor">Motor (-127 to 127)</option></select>
+          <input id="nmname" placeholder="variable name e.g. scraper">
+          <div class="btn cy" onclick="addMech()">+ Add Mechanism</div>
+        </div>
+        <div class="mhint">
+          <b style="color:var(--txt2)">Piston</b> → <code style="color:var(--red)">name.set(true/false)</code><br>
+          <b style="color:var(--txt2)">Motor</b> → <code style="color:var(--cyan)">name.move(value)</code><br>
+          <b style="color:var(--txt2)">Delay</b> → <code style="color:var(--yellow)">pros::delay(ms)</code><br><br>
+          Renaming updates all actions automatically.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// ══════════════════════════════════════════════════════
+// FIELD SPEC — Push Back 2025-26
+//
+// Rows A-F: A = top, F = bottom
+// Cols 1-6: 1 = left, 6 = right
+// A1 = top-left corner, F6 = bottom-right corner
+//
+// Canvas: origin top-left, Y increases downward
+// 1 tile = 24 inches
+// ══════════════════════════════════════════════════════
+const TILE    = 24;
+const FTILES  = 6;
+const FIELD_IN = TILE * FTILES; // 144in
+
+// Row letter → 0-indexed (A=0 top, F=5 bottom)
+const ROW = { A:0, B:1, C:2, D:3, E:4, F:5 };
+
+// Tile top-left corner in canvas-inches
+function tl(col, rowLetter) {
+  return { x: (col-1)*TILE, y: ROW[rowLetter]*TILE };
+}
+// Tile center in canvas-inches
+function tc(col, rowLetter) {
+  return { x: (col-0.5)*TILE, y: (ROW[rowLetter]+0.5)*TILE };
+}
+
+// ── LONG GOALS ─────────────────────────────────────────
+// Goal 1: in gap between rows A and B, spanning cols 3–4
+//   y = ROW.B * TILE = 1*24 = 24  (top of row B = bottom edge of row A)
+// Goal 2: in gap between rows E and F, spanning cols 3–4
+//   y = ROW.F * TILE = 5*24 = 120 (top of row F = bottom edge of row E)
+// Each spans exactly 2 tile widths (cols 3 and 4), x = 2*TILE to 4*TILE
+const GOAL_H = 9;
+const LONG_GOALS = [
+  { x: 2*TILE, y: 1*TILE - GOAL_H/2, w: 2*TILE, h: GOAL_H }, // A/B gap
+  { x: 2*TILE, y: 5*TILE - GOAL_H/2, w: 2*TILE, h: GOAL_H }, // E/F gap
+];
+
+// ── CENTER GOALS (X pattern) ──────────────────────────
+// Centered in the middle of tiles C3, C4, D3, D4
+// Field center x = 3*TILE = 72in (between cols 3 and 4)
+// Field center y = 2.5*TILE = 60in (between rows C and D, since C=row index 2)
+// X pattern: 4 octagons placed diagonally at ~0.6 tile offset from center
+const CX      = 3 * TILE;        // 72in — between col 3 and col 4
+const CY      = 2.5 * TILE;      // 60in — between row C (idx 2) and row D (idx 3)
+const CG_OFF  = TILE * 0.62;
+const CG_SIZE = TILE * 0.38;
+
+// (center goal drawn as X directly in draw())
+
+// ── MATCHLOADERS ─────────────────────────────────────
+// Half-circle bumpers on LEFT and RIGHT walls
+// Same Y rows as the long goals: A/B gap (y=1*TILE) and E/F gap (y=5*TILE)
+const ML_CORNERS = [
+  { x: 0,      y: 1*TILE, wall:'left'  }, // left wall,  A/B row
+  { x: 0,      y: 5*TILE, wall:'left'  }, // left wall,  E/F row
+  { x: 6*TILE, y: 1*TILE, wall:'right' }, // right wall, A/B row
+  { x: 6*TILE, y: 5*TILE, wall:'right' }, // right wall, E/F row
+];
+
+// ── CENTER GOAL — single geometric X ─────────────────
+// One X-shaped metal structure at the absolute field center
+// x = 3*TILE (between cols 3 and 4), y = 3*TILE (between rows C and D)
+const MID_X  = 3 * TILE;
+const MID_Y  = 3 * TILE;
+const MID_ARM = 22.6; // inches per arm, from spec sheet
+
+// ══════════════════════════════════════════════════════
+// APP STATE
+// ══════════════════════════════════════════════════════
+let fieldMode = 'match';
+let waypoints  = []; // [0] = start
+let selIdx     = null;
+let dragging   = null, dOX=0, dOY=0;
+let CSZ        = 520;
+let SCALE      = CSZ / FIELD_IN;
+
+let mechanisms = [
+  {name:'scraper',      type:'piston'},
+  {name:'intakebottom', type:'motor'},
+  {name:'intaketop',    type:'motor'},
+  {name:'descore',      type:'piston'},
+];
+const SPEEDS = ['DRIVE_SPEED','DRIVE_SPEED2','DRIVE_SPEED3','DRIVE_SPEED4','DRIVE_SPEEDGOAL'];
+
+// ══════════════════════════════════════════════════════
+// CANVAS
+// ══════════════════════════════════════════════════════
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+function resize() {
+  const el = document.querySelector('.ffield');
+  const s = Math.min(el.clientWidth-20, el.clientHeight-20, 580);
+  CSZ = Math.max(280, s);
+  SCALE = CSZ / FIELD_IN;
+  cv.width = CSZ; cv.height = CSZ;
+  draw();
+}
+window.addEventListener('resize', resize);
+setTimeout(resize, 50);
+
+// Coord helpers — top-down: A row = top = y:0, F row = bottom = y:5*TILE
+function f2c(fx, fy) { return { cx: fx*SCALE, cy: fy*SCALE }; }
+function c2f(cx, cy) { return { fx: cx/SCALE, fy: cy/SCALE }; }
+// Tile bottom-left corner in inches
+function txy(col, row) { return { x: (col-1)*TILE, y: (row-1)*TILE }; }
+
+// ══════════════════════════════════════════════════════
+// DRAW
+// ══════════════════════════════════════════════════════
+function draw() {
+  ctx.clearRect(0,0,CSZ,CSZ);
+  ctx.shadowBlur = 0;
+  const ts = TILE * SCALE; // tile size in pixels
+
+  // ── Tile backgrounds ──
+  const ROWS = ['A','B','C','D','E','F'];
+  for (let ci=0; ci<6; ci++) {
+    for (let ri=0; ri<6; ri++) {
+      const px = ci * ts, py = ri * ts;
+      ctx.fillStyle = (ci+ri)%2===0 ? '#1e2530' : '#1a2028';
+      ctx.fillRect(px, py, ts, ts);
+    }
+  }
+
+  // ── Tile grid lines ──
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  for (let i=0; i<=6; i++) {
+    const p = i * ts;
+    ctx.beginPath(); ctx.moveTo(p,0); ctx.lineTo(p,CSZ); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(CSZ,p); ctx.stroke();
+  }
+
+  // ── Tile labels (col number + row letter) ──
+  if (CSZ > 380) {
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.font = `${Math.max(7,CSZ*0.022)}px DM Mono`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let ci=0; ci<6; ci++) {
+      for (let ri=0; ri<6; ri++) {
+        ctx.fillText(`${ROWS[ri]}${ci+1}`, (ci+0.5)*ts, (ri+0.5)*ts);
+      }
+    }
+  }
+
+  // ── Long Goals — thin bar with X end caps ──
+  // Spec: 48.79" total, bar depth ~4", end cap arms = 3.76" each
+  LONG_GOALS.forEach(g => {
+    const {cx: gx, cy: gy} = f2c(g.x, g.y);
+    const gw = g.w * SCALE;
+    const gh = g.h * SCALE;
+    const barMidY = gy + gh/2;
+
+    // X end caps first (behind bar)
+    const a  = 3.76 * SCALE;  // arm length from spec
+    const aw = a * 0.35;       // uniform arm width
+    [[gx, barMidY], [gx + gw, barMidY]].forEach(([cx, cy]) => {
+      ctx.fillStyle = 'rgba(220,230,240,0.22)';
+      ctx.strokeStyle = 'rgba(220,230,255,0.85)';
+      ctx.lineWidth = 1.5;
+      [-Math.PI*3/4, -Math.PI/4, Math.PI/4, Math.PI*3/4].forEach(ang => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(ang);
+        ctx.beginPath();
+        ctx.rect(-aw/2, -a, aw, a);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      });
+    });
+
+    // Main bar body on top
+    ctx.fillStyle = 'rgba(220,230,240,0.18)';
+    ctx.fillRect(gx, gy, gw, gh);
+    ctx.strokeStyle = 'rgba(220,230,255,0.85)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(gx, gy, gw, gh);
+
+    if (CSZ > 350) {
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = `600 ${Math.max(7,CSZ*0.013)}px DM Sans`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('GOAL', gx+gw/2, barMidY);
+    }
+  });
+
+  // ── Center Goal — 4 uniform-width rectangular arms forming an X ──
+  const {cx: xcx, cy: xcy} = f2c(MID_X, MID_Y);
+  const armLen = MID_ARM * SCALE;
+  const armW   = armLen * 0.28;
+
+  ctx.fillStyle = 'rgba(220,230,240,0.2)';
+  ctx.strokeStyle = 'rgba(220,230,255,0.85)';
+  ctx.lineWidth = 1.5;
+
+  [-Math.PI*3/4, -Math.PI/4, Math.PI/4, Math.PI*3/4].forEach(a => {
+    ctx.save();
+    ctx.translate(xcx, xcy);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.rect(-armW/2, -armLen, armW, armLen);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Center hub
+  ctx.beginPath();
+  ctx.arc(xcx, xcy, armW * 0.55, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(220,230,255,0.35)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(220,230,255,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── Matchloader bumpers — half-circles on side walls ──
+  const ML_R = Math.max(7, CSZ * 0.025);
+  ML_CORNERS.forEach(ml => {
+    const {cy: dotY} = f2c(ml.x, ml.y);
+    const dotX = ml.wall === 'left' ? 0 : CSZ;
+    const startA = ml.wall === 'left' ? -Math.PI/2 : Math.PI/2;
+    const endA   = ml.wall === 'left' ?  Math.PI/2 : 3*Math.PI/2;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, ML_R, startA, endA);
+    ctx.fillStyle = 'rgba(220,230,255,0.8)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // ── Field border ──
+  ctx.strokeStyle = 'rgba(0,212,232,0.4)';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(1,1,CSZ-2,CSZ-2);
+
+  // ── PATH ──
+  if (waypoints.length > 1) {
+    ctx.strokeStyle = 'rgba(0,212,232,0.55)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7,5]);
+    ctx.beginPath();
+    const fp = f2c(waypoints[0].x, waypoints[0].y);
+    ctx.moveTo(fp.cx, fp.cy);
+    for (let i=1; i<waypoints.length; i++) {
+      const p = f2c(waypoints[i].x, waypoints[i].y);
+      ctx.lineTo(p.cx, p.cy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (let i=0; i<waypoints.length-1; i++) {
+      const a = f2c(waypoints[i].x, waypoints[i].y);
+      const b = f2c(waypoints[i+1].x, waypoints[i+1].y);
+      drawArrow(a.cx, a.cy, b.cx, b.cy);
+    }
+  }
+
+  // ── Waypoint dots ──
+  waypoints.forEach((wp, i) => {
+    const {cx,cy} = f2c(wp.x, wp.y);
+    const sel = i===selIdx;
+    const isS = i===0;
+    const r = sel ? 10 : 8;
+    const col = isS ? '#00e5a0' : '#00d4e8';
+
+    const g = ctx.createRadialGradient(cx,cy,0,cx,cy,r*3);
+    g.addColorStop(0, isS?'rgba(0,229,160,0.22)':'rgba(0,212,232,0.18)');
+    g.addColorStop(1,'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx,cy,r*3,0,Math.PI*2); ctx.fill();
+
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle = isS?'rgba(0,229,160,0.18)':'rgba(0,212,232,0.13)'; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = sel?2.5:1.8; ctx.stroke();
+
+    ctx.fillStyle = col;
+    ctx.font = `600 ${Math.max(9,CSZ*0.021)}px DM Sans`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(isS?'S':i, cx, cy);
+
+    if (wp.actions?.length > 0) {
+      ctx.beginPath(); ctx.arc(cx+r*.7, cy-r*.7, 3.5,0,Math.PI*2);
+      ctx.fillStyle='#ff4d6a'; ctx.fill();
+    }
+  });
+
+  // Drag tooltip
+  if (dragging!==null) {
+    const wp = waypoints[dragging];
+    const {cx,cy} = f2c(wp.x, wp.y);
+    const txt = `${wp.x.toFixed(1)}", ${wp.y.toFixed(1)}"`;
+    ctx.font = '10px DM Mono';
+    const tw2 = ctx.measureText(txt).width+16;
+    ctx.fillStyle='rgba(13,17,23,0.92)';
+    ctx.beginPath(); ctx.roundRect(cx+13,cy-22,tw2,20,4); ctx.fill();
+    ctx.strokeStyle='rgba(0,212,232,0.4)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#00d4e8'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(txt, cx+21, cy-12);
+  }
+}
+
+function drawArrow(x1,y1,x2,y2) {
+  const mx=(x1+x2)/2, my=(y1+y2)/2;
+  const a=Math.atan2(y2-y1,x2-x1), sz=7;
+  ctx.fillStyle='rgba(0,212,232,0.75)';
+  ctx.beginPath();
+  ctx.moveTo(mx+Math.cos(a)*sz, my+Math.sin(a)*sz);
+  ctx.lineTo(mx+Math.cos(a+2.5)*sz*.6, my+Math.sin(a+2.5)*sz*.6);
+  ctx.lineTo(mx+Math.cos(a-2.5)*sz*.6, my+Math.sin(a-2.5)*sz*.6);
+  ctx.closePath(); ctx.fill();
+}
+
+// ══════════════════════════════════════════════════════
+// INPUT
+// ══════════════════════════════════════════════════════
+function getPos(e) {
+  const r=cv.getBoundingClientRect();
+  return {
+    cx: (e.touches?e.touches[0].clientX:e.clientX)-r.left,
+    cy: (e.touches?e.touches[0].clientY:e.clientY)-r.top
+  };
+}
+function hitTest(cx,cy) {
+  for (let i=waypoints.length-1; i>=0; i--) {
+    const p=f2c(waypoints[i].x, waypoints[i].y);
+    if (Math.hypot(cx-p.cx, cy-p.cy)<14) return i;
+  }
+  return -1;
+}
+function clamp(v) { return Math.max(0, Math.min(FIELD_IN, v)); }
+
+cv.addEventListener('mousedown', e=>{
+  const {cx,cy}=getPos(e);
+  const hit=hitTest(cx,cy);
+  if (hit>=0) {
+    dragging=hit; selIdx=hit;
+    const p=f2c(waypoints[hit].x, waypoints[hit].y);
+    dOX=cx-p.cx; dOY=cy-p.cy;
+  } else {
+    const {fx,fy}=c2f(cx,cy);
+    waypoints.push({x:clamp(fx), y:clamp(fy), speed:'DRIVE_SPEED', actions:[], concurrent:false});
+    selIdx=waypoints.length-1;
+  }
+  refresh();
+});
+cv.addEventListener('mousemove', e=>{
+  if (dragging===null) return;
+  const {cx,cy}=getPos(e);
+  const {fx,fy}=c2f(cx-dOX, cy-dOY);
+  waypoints[dragging].x=clamp(fx);
+  waypoints[dragging].y=clamp(fy);
+  refresh();
+});
+cv.addEventListener('mouseup', ()=>{ dragging=null; draw(); });
+cv.addEventListener('mouseleave', ()=>{ dragging=null; draw(); });
+
+// ══════════════════════════════════════════════════════
+// REFRESH — called after ANY state change
+// Updates everything in real-time
+// ══════════════════════════════════════════════════════
+function refresh() {
+  renderWpList();
+  renderEditor();
+  generateCode();
+  draw();
+}
+
+// ══════════════════════════════════════════════════════
+// WAYPOINT LIST
+// ══════════════════════════════════════════════════════
+function renderWpList() {
+  const list=document.getElementById('wlist');
+  list.innerHTML='';
+  waypoints.forEach((wp,i)=>{
+    const d=document.createElement('div');
+    const isS=i===0;
+    d.className='wcard'+(i===selIdx?' sel':'')+(isS?' startc':'');
+    d.innerHTML=`
+      <div class="wctop">
+        <span class="wbadge">${isS?'START':i}</span>
+        <span class="wcname">${isS?'Start':'Waypoint '+i}</span>
+      </div>
+      <div class="wccoords">(${wp.x.toFixed(1)}", ${wp.y.toFixed(1)}")</div>
+      ${wp.actions?.length?`<div class="wcact">▶ ${wp.actions.length} action${wp.actions.length>1?'s':''}</div>`:''}
+      <span class="wdel" onclick="delWp(${i},event)">✕</span>`;
+    d.addEventListener('click',()=>{ selIdx=i; refresh(); });
+    list.appendChild(d);
+  });
+}
+
+function delWp(i,e) {
+  e.stopPropagation();
+  waypoints.splice(i,1);
+  if (selIdx>=waypoints.length) selIdx=waypoints.length-1;
+  if (!waypoints.length) selIdx=null;
+  refresh();
+}
+
+function clearAll() {
+  waypoints=[];
+  selIdx=null;
+  refresh();
+}
+
+// ══════════════════════════════════════════════════════
+// EDITOR
+// ══════════════════════════════════════════════════════
+function renderEditor() {
+  const el=document.getElementById('einner');
+  if (selIdx===null || !waypoints[selIdx]) {
+    el.innerHTML=`<div class="nosel"><div class="nosel-icon">◎</div><div>Click the field to place a waypoint,<br>or select one from the list</div></div>`;
+    return;
+  }
+  const wp=waypoints[selIdx], i=selIdx, isS=i===0;
+  let meta='';
+  if (i>0) {
+    const p=waypoints[i-1];
+    const dist=Math.hypot(wp.x-p.x, wp.y-p.y);
+    const ang=(Math.atan2(wp.x-p.x, wp.y-p.y)*180/Math.PI).toFixed(1);
+    meta=`<div class="metarow"><span>dist <span class="mval">${dist.toFixed(2)}"</span></span><span>turn <span class="mval">${ang}°</span></span></div>`;
+  }
+  el.innerHTML=`<div class="einner">
+    <div class="etitle${isS?' green':''}">${isS?'⬤ Start Position':'◉ Waypoint '+i}</div>
+    <div class="frow">
+      <div class="fcol"><label class="flabel">X (in)</label>
+        <input class="finput" type="number" step="0.1" value="${wp.x.toFixed(1)}" onchange="upWP(${i},'x',+this.value)"></div>
+      <div class="fcol"><label class="flabel">Y (in)</label>
+        <input class="finput" type="number" step="0.1" value="${wp.y.toFixed(1)}" onchange="upWP(${i},'y',+this.value)"></div>
+    </div>
+    ${meta}
+    ${!isS?`<div style="margin-bottom:9px">
+      <label class="flabel">Drive Speed</label>
+      <select class="fselect" onchange="upWP(${i},'speed',this.value)">
+        ${SPEEDS.map(s=>`<option${wp.speed===s?' selected':''}>${s}</option>`).join('')}
+      </select></div>
+    <label class="cbrow"><input type="checkbox"${wp.concurrent?' checked':''} onchange="upWP(${i},'concurrent',this.checked)">
+      Skip pid_wait (concurrent next cmd)</label>`:''}
+    <div class="slabel">Actions at this waypoint</div>
+    <div id="alist"></div>
+    <div class="addrow">
+      <select id="nasel">
+        <option value="">— add action —</option>
+        ${mechanisms.map(m=>`<option value="${m.name}|${m.type}">${m.name} (${m.type})</option>`).join('')}
+        <option value="__delay__|delay">pros::delay (ms)</option>
+      </select>
+      <div class="btn cy" style="flex-shrink:0;padding:5px 9px" onclick="addAction(${i})">Add</div>
+    </div>
+  </div>`;
+  renderAList(i);
+}
+
+function renderAList(i) {
+  const c=document.getElementById('alist'); if(!c) return;
+  c.innerHTML='';
+  waypoints[i].actions.forEach((a,ai)=>{
+    const d=document.createElement('div');
+    d.className='acard';
+    let ctrl='';
+    if (a.type==='piston') ctrl=`<label>State:</label><select onchange="upA(${i},${ai},'value',this.value)"><option value="true"${a.value==='true'?' selected':''}>true (deploy)</option><option value="false"${a.value==='false'?' selected':''}>false (retract)</option></select>`;
+    else if (a.type==='motor') ctrl=`<label>Power:</label><input type="number" min="-127" max="127" value="${a.value||127}" onchange="upA(${i},${ai},'value',this.value)">`;
+    else if (a.type==='delay') ctrl=`<label>ms:</label><input type="number" min="0" value="${a.value||1000}" onchange="upA(${i},${ai},'value',this.value)">`;
+    d.innerHTML=`<div class="aname">${a.name}</div><span class="adel" onclick="delA(${i},${ai})">✕</span><div class="arow">${ctrl}</div>`;
+    c.appendChild(d);
+  });
+}
+
+function upWP(i,k,v) { waypoints[i][k]=v; refresh(); }
+function addAction(i) {
+  const s=document.getElementById('nasel'); if(!s?.value) return;
+  const [name,type]=s.value.split('|');
+  waypoints[i].actions.push({name, type, value: type==='piston'?'true':type==='delay'?'1000':'127'});
+  s.value=''; refresh();
+}
+function upA(i,ai,k,v) { waypoints[i].actions[ai][k]=v; generateCode(); }
+function delA(i,ai) { waypoints[i].actions.splice(ai,1); refresh(); }
+
+// ══════════════════════════════════════════════════════
+// CODE GENERATION
+// ══════════════════════════════════════════════════════
+function generateCode() {
+  const out=document.getElementById('cout');
+  const stat=document.getElementById('cstat');
+  if (!out) return;
+
+  const path=waypoints.slice(1);
+  stat.textContent=`${waypoints.length} waypoint${waypoints.length!==1?'s':''}`;
+
+  if (!waypoints.length) {
+    out.innerHTML=s('cc','// No waypoints yet.\n// Click the field to start placing waypoints.');
+    return;
+  }
+
+  const L=[];
+  L.push(s('cc','// Generated by Auton Planner — Syndicate'));
+  L.push(s('cc',`// Push Back 2025-26 | EZ-Template | ${path.length} move${path.length!==1?'s':''}`));
+  L.push('');
+
+  // Start position actions
+  if (waypoints[0]?.actions?.length) {
+    L.push(s('cc','// — Start position'));
+    waypoints[0].actions.forEach(a=>L.push(genA(a)));
+    L.push('');
+  }
+
+  let curAng=0;
+  for (let i=1; i<waypoints.length; i++) {
+    const wp=waypoints[i], prev=waypoints[i-1];
+    L.push(s('cc',`// — Waypoint ${i} (${wp.x.toFixed(1)}", ${wp.y.toFixed(1)}")`));
+    const dx=wp.x-prev.x, dy=wp.y-prev.y;
+    const dist=Math.hypot(dx,dy);
+    const tgt=Math.atan2(dx,dy)*180/Math.PI;
+    let diff=((tgt-curAng+180)%360)-180;
+    const newAng=curAng+diff;
+
+    if (Math.abs(diff)>1.0) {
+      L.push(s('cf','chassis')+'.'+s('cf','pid_turn_set')+'('+s('cn',newAng.toFixed(1)+'_deg')+', '+s('cf','TURN_SPEED')+');');
+      L.push(s('cf','chassis')+'.'+s('cf','pid_wait')+'();');
+      curAng=newAng;
+    }
+    L.push(s('cf','chassis')+'.'+s('cf','pid_drive_set')+'('+s('cn',dist.toFixed(2)+'_in')+', '+s('cf',wp.speed)+', '+s('ck','true')+');');
+    if (!wp.concurrent) L.push(s('cf','chassis')+'.'+s('cf','pid_wait')+'();');
+    wp.actions?.forEach(a=>L.push(genA(a)));
+    L.push('');
+  }
+  out.innerHTML=L.join('\n');
+}
+
+function genA(a) {
+  if (a.type==='piston') return s('cm',a.name)+'.set('+s('ck',a.value)+');';
+  if (a.type==='motor')  return s('cm',a.name)+'.move('+s('cn',a.value)+');';
+  if (a.type==='delay')  return s('cf','pros')+'::'+s('cf','delay')+'('+s('cn',a.value)+');';
+  return '';
+}
+function s(cls,txt) {
+  return {cc:'cc',cf:'cf',cn:'cn',ck:'ck',cm:'cm'}[cls]
+    ? `<span class="${cls}">${txt}</span>` : txt;
+}
+function copyCode() {
+  navigator.clipboard.writeText(document.getElementById('cout').innerText).then(()=>{
+    const b=event.target; const o=b.textContent;
+    b.textContent='Copied!'; setTimeout(()=>b.textContent=o,1500);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// MECHS
+// ══════════════════════════════════════════════════════
+function renderMechList() {
+  const list=document.getElementById('mlist'); list.innerHTML='';
+  mechanisms.forEach((m,i)=>{
+    const d=document.createElement('div'); d.className='mrow';
+    d.innerHTML=`<span class="mbadge ${m.type}">${m.type}</span>
+      <input class="minput" value="${m.name}" onchange="renameMech(${i},this.value)">
+      <span class="mdel" onclick="delMech(${i})">✕</span>`;
+    list.appendChild(d);
+  });
+}
+function renameMech(i,n) {
+  const old=mechanisms[i].name; mechanisms[i].name=n;
+  waypoints.forEach(wp=>wp.actions?.forEach(a=>{ if(a.name===old) a.name=n; }));
+  generateCode(); renderEditor();
+}
+function delMech(i) { mechanisms.splice(i,1); renderMechList(); renderEditor(); }
+function addMech() {
+  const n=document.getElementById('nmname').value.trim();
+  const t=document.getElementById('nmtype').value;
+  if (!n) return;
+  mechanisms.push({name:n,type:t});
+  document.getElementById('nmname').value='';
+  renderMechList(); renderEditor();
+}
+
+// ══════════════════════════════════════════════════════
+// TABS & FIELD MODE
+// ══════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('on',['editor','code','mechs'][i]===tab));
+  document.querySelectorAll('.tbody').forEach(t=>t.classList.remove('on'));
+  document.getElementById('tb-'+tab).classList.add('on');
+  if (tab==='mechs') renderMechList();
+}
+
+function setMode(m) {
+  fieldMode=m;
+  document.querySelectorAll('.ftbtn').forEach((b,i)=>b.classList.toggle('on',['match','skills'][i]===m));
+  draw();
+}
+
+// ── INIT ──
+refresh();
+renderMechList();
+</script>
+</body>
+</html>
