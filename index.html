@@ -133,10 +133,10 @@ canvas{display:block;cursor:crosshair;}
 <header>
   <div class="hlogo">12S — <span>Auton Planner</span></div>
   <div class="hdiv"></div>
-  <span class="hsub">Push Back 2025–26 · EZ-Template · V5RC</span>
+  <span class="hsub">Override 2026–27 · EZ-Template · V5RC</span>
   <div class="ftoggle">
-    <button class="ftbtn on" onclick="setMode('match')">Match</button>
-    <button class="ftbtn" onclick="setMode('skills')">Skills</button>
+    <button class="ftbtn on" onclick="setMode('pid')">PID</button>
+    <button class="ftbtn" onclick="setMode('odom')">Odom</button>
   </div>
 </header>
 <div class="main">
@@ -186,76 +186,82 @@ canvas{display:block;cursor:crosshair;}
 </div>
 <script>
 // ══════════════════════════════════════════════════════
-// FIELD SPEC — Push Back 2025-26
+// FIELD SPEC — Override 2026-27
 //
-// Rows A-F: A = top, F = bottom
-// Cols 1-6: 1 = left, 6 = right
-// A1 = top-left corner, F6 = bottom-right corner
+// 12'x12' field (144in x 144in), same overall footprint as Push Back.
+// Layout is NOT a uniform 6x6 grid this season — the field is split by a
+// diagonal Autonomous Line into 4 Quadrants (one per Alliance Station
+// corner), with a diamond-shaped contested Midfield in the center.
 //
-// Canvas: origin top-left, Y increases downward
-// 1 tile = 24 inches
+// Canvas: origin top-left, Y increases downward.
+// Alliance Stations: Red = top-left & bottom-right corners (this build
+// assumes standard orientation — flip if your field is mirrored).
+//
+// NOTE: exact Appendix A dimensions weren't available to me — the
+// positions below are geometrically reasonable placements based on the
+// described layout (goals ~1 tile off each Alliance Station, toggles
+// centered on each wall, loaders in each corner). True these up against
+// your printed field or the manual PDF before trusting auton distances
+// to the inch.
 // ══════════════════════════════════════════════════════
 const TILE    = 24;
 const FTILES  = 6;
 const FIELD_IN = TILE * FTILES; // 144in
+const FIELD_MID = FIELD_IN / 2; // 72in
 
-// Row letter → 0-indexed (A=0 top, F=5 bottom)
-const ROW = { A:0, B:1, C:2, D:3, E:4, F:5 };
-
-// Tile top-left corner in canvas-inches
-function tl(col, rowLetter) {
-  return { x: (col-1)*TILE, y: ROW[rowLetter]*TILE };
-}
-// Tile center in canvas-inches
-function tc(col, rowLetter) {
-  return { x: (col-0.5)*TILE, y: (ROW[rowLetter]+0.5)*TILE };
-}
-
-// ── LONG GOALS ─────────────────────────────────────────
-// Goal 1: in gap between rows A and B, spanning cols 3–4
-//   y = ROW.B * TILE = 1*24 = 24  (top of row B = bottom edge of row A)
-// Goal 2: in gap between rows E and F, spanning cols 3–4
-//   y = ROW.F * TILE = 5*24 = 120 (top of row F = bottom edge of row E)
-// Each spans exactly 2 tile widths (cols 3 and 4), x = 2*TILE to 4*TILE
-const GOAL_H = 9;
-const LONG_GOALS = [
-  { x: 2*TILE, y: 1*TILE - GOAL_H/2, w: 2*TILE, h: GOAL_H }, // A/B gap
-  { x: 2*TILE, y: 5*TILE - GOAL_H/2, w: 2*TILE, h: GOAL_H }, // E/F gap
+// ── AUTONOMOUS LINE (diagonal, corner to corner) ──────
+// Splits the field into 4 Quadrants. Assumes the line runs from the
+// top-right corner to the bottom-left corner.
+const AUTON_LINE = [
+  { x: FIELD_IN, y: 0 },
+  { x: 0,        y: FIELD_IN },
 ];
 
-// ── CENTER GOALS (X pattern) ──────────────────────────
-// Centered in the middle of tiles C3, C4, D3, D4
-// Field center x = 3*TILE = 72in (between cols 3 and 4)
-// Field center y = 2.5*TILE = 60in (between rows C and D, since C=row index 2)
-// X pattern: 4 octagons placed diagonally at ~0.6 tile offset from center
-const CX      = 3 * TILE;        // 72in — between col 3 and col 4
-const CY      = 2.5 * TILE;      // 60in — between row C (idx 2) and row D (idx 3)
-const CG_OFF  = TILE * 0.62;
-const CG_SIZE = TILE * 0.38;
+// ── MIDFIELD — contested diamond zone at field center ─
+const MIDFIELD_RADIUS = TILE * 1.15; // ~27.6in from center to each tip
 
-// (center goal drawn as X directly in draw())
+// ── GOALS ──────────────────────────────────────────────
+// 9 total: 4 Alliance goals (2 Red, 2 Blue) tucked near each Alliance
+// Station, 4 short neutral goals along the mid-walls, 1 tall neutral
+// goal dead-center (inside the Midfield diamond).
+const GOAL_SIZE = 13; // approx square footprint, inches
 
-// ── MATCHLOADERS ─────────────────────────────────────
-// Half-circle bumpers on LEFT and RIGHT walls
-// Same Y rows as the long goals: A/B gap (y=1*TILE) and E/F gap (y=5*TILE)
-const ML_CORNERS = [
-  { x: 0,      y: 1*TILE, wall:'left'  }, // left wall,  A/B row
-  { x: 0,      y: 5*TILE, wall:'left'  }, // left wall,  E/F row
-  { x: 6*TILE, y: 1*TILE, wall:'right' }, // right wall, A/B row
-  { x: 6*TILE, y: 5*TILE, wall:'right' }, // right wall, E/F row
+const ALLIANCE_GOALS = [
+  { x: 1*TILE,          y: 1*TILE,          color: 'red'  }, // near top-left station
+  { x: FIELD_IN-1*TILE, y: FIELD_IN-1*TILE, color: 'red'  }, // near bottom-right station
+  { x: FIELD_IN-1*TILE, y: 1*TILE,          color: 'blue' }, // near top-right station
+  { x: 1*TILE,          y: FIELD_IN-1*TILE, color: 'blue' }, // near bottom-left station
 ];
 
-// ── CENTER GOAL — single geometric X ─────────────────
-// One X-shaped metal structure at the absolute field center
-// x = 3*TILE (between cols 3 and 4), y = 3*TILE (between rows C and D)
-const MID_X  = 3 * TILE;
-const MID_Y  = 3 * TILE;
-const MID_ARM = 22.6; // inches per arm, from spec sheet
+const NEUTRAL_GOALS = [
+  { x: FIELD_MID, y: 0.6*TILE },              // top mid-wall
+  { x: FIELD_MID, y: FIELD_IN - 0.6*TILE },   // bottom mid-wall
+  { x: 0.6*TILE,  y: FIELD_MID },             // left mid-wall
+  { x: FIELD_IN - 0.6*TILE, y: FIELD_MID },   // right mid-wall
+];
+
+const TALL_GOAL = { x: FIELD_MID, y: FIELD_MID }; // center of Midfield
+
+// ── TOGGLES — one centered on each of the 4 field walls ─
+const TOGGLES = [
+  { x: FIELD_MID, y: 0,         wall: 'top'    },
+  { x: FIELD_MID, y: FIELD_IN,  wall: 'bottom' },
+  { x: 0,         y: FIELD_MID, wall: 'left'   },
+  { x: FIELD_IN,  y: FIELD_MID, wall: 'right'  },
+];
+
+// ── LOADERS — 2 per Alliance Station, one in each corner ─
+const LOADERS = [
+  { x: 0,        y: 0,        corner: 'tl' },
+  { x: FIELD_IN, y: 0,        corner: 'tr' },
+  { x: 0,        y: FIELD_IN, corner: 'bl' },
+  { x: FIELD_IN, y: FIELD_IN, corner: 'br' },
+];
 
 // ══════════════════════════════════════════════════════
 // APP STATE
 // ══════════════════════════════════════════════════════
-let fieldMode = 'match';
+let fieldMode = 'pid'; // 'pid' or 'odom' — both use the same waypoint (x,y) coordinate set,
 let waypoints  = []; // [0] = start
 let selIdx     = null;
 let dragging   = null, dOX=0, dOY=0;
@@ -301,8 +307,7 @@ function draw() {
   ctx.shadowBlur = 0;
   const ts = TILE * SCALE; // tile size in pixels
 
-  // ── Tile backgrounds ──
-  const ROWS = ['A','B','C','D','E','F'];
+  // ── Tile backgrounds (still 6x6 grid for reference/coordinates) ──
   for (let ci=0; ci<6; ci++) {
     for (let ri=0; ri<6; ri++) {
       const px = ci * ts, py = ri * ts;
@@ -320,101 +325,138 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(CSZ,p); ctx.stroke();
   }
 
-  // ── Tile labels (col number + row letter) ──
-  if (CSZ > 380) {
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    ctx.font = `${Math.max(7,CSZ*0.022)}px DM Mono`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let ci=0; ci<6; ci++) {
-      for (let ri=0; ri<6; ri++) {
-        ctx.fillText(`${ROWS[ri]}${ci+1}`, (ci+0.5)*ts, (ri+0.5)*ts);
-      }
+  // ── Quadrant shading (Red top-left/bottom-right, Blue top-right/bottom-left) ──
+  const half = CSZ/2;
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.fillStyle = '#ff4d6a';
+  ctx.fillRect(0,0,half,half);
+  ctx.fillRect(half,half,half,half);
+  ctx.fillStyle = '#3d9fff';
+  ctx.fillRect(half,0,half,half);
+  ctx.fillRect(0,half,half,half);
+  ctx.restore();
+
+  // ── Autonomous Line (diagonal, TR to BL) ──
+  {
+    const p1 = f2c(AUTON_LINE[0].x, AUTON_LINE[0].y);
+    const p2 = f2c(AUTON_LINE[1].x, AUTON_LINE[1].y);
+    ctx.strokeStyle = 'rgba(255,209,102,0.65)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([9,6]);
+    ctx.beginPath();
+    ctx.moveTo(p1.cx, p1.cy);
+    ctx.lineTo(p2.cx, p2.cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── Midfield — contested diamond at center ──
+  {
+    const {cx, cy} = f2c(FIELD_MID, FIELD_MID);
+    const r = MIDFIELD_RADIUS * SCALE;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy-r);
+    ctx.lineTo(cx+r, cy);
+    ctx.lineTo(cx, cy+r);
+    ctx.lineTo(cx-r, cy);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (CSZ > 350) {
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = `600 ${Math.max(7,CSZ*0.017)}px DM Sans`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('MIDFIELD', cx, cy - r - 10);
     }
   }
 
-  // ── Long Goals — thin bar with X end caps ──
-  // Spec: 48.79" total, bar depth ~4", end cap arms = 3.76" each
-  LONG_GOALS.forEach(g => {
-    const {cx: gx, cy: gy} = f2c(g.x, g.y);
-    const gw = g.w * SCALE;
-    const gh = g.h * SCALE;
-    const barMidY = gy + gh/2;
-
-    // X end caps first (behind bar)
-    const a  = 3.76 * SCALE;  // arm length from spec
-    const aw = a * 0.35;       // uniform arm width
-    [[gx, barMidY], [gx + gw, barMidY]].forEach(([cx, cy]) => {
-      ctx.fillStyle = 'rgba(220,230,240,0.22)';
-      ctx.strokeStyle = 'rgba(220,230,255,0.85)';
-      ctx.lineWidth = 1.5;
-      [-Math.PI*3/4, -Math.PI/4, Math.PI/4, Math.PI*3/4].forEach(ang => {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(ang);
-        ctx.beginPath();
-        ctx.rect(-aw/2, -a, aw, a);
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-      });
-    });
-
-    // Main bar body on top
-    ctx.fillStyle = 'rgba(220,230,240,0.18)';
-    ctx.fillRect(gx, gy, gw, gh);
-    ctx.strokeStyle = 'rgba(220,230,255,0.85)';
+  // ── Alliance Goals (small squares, red/blue outline) ──
+  ALLIANCE_GOALS.forEach(g => {
+    const {cx, cy} = f2c(g.x, g.y);
+    const sz = GOAL_SIZE * SCALE;
+    const col = g.color === 'red' ? 'rgba(255,77,106,0.9)' : 'rgba(61,159,255,0.9)';
+    const fillCol = g.color === 'red' ? 'rgba(255,77,106,0.18)' : 'rgba(61,159,255,0.18)';
+    ctx.fillStyle = fillCol;
+    ctx.fillRect(cx-sz/2, cy-sz/2, sz, sz);
+    ctx.strokeStyle = col;
     ctx.lineWidth = 2;
-    ctx.strokeRect(gx, gy, gw, gh);
-
-    if (CSZ > 350) {
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = `600 ${Math.max(7,CSZ*0.013)}px DM Sans`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('GOAL', gx+gw/2, barMidY);
-    }
+    ctx.strokeRect(cx-sz/2, cy-sz/2, sz, sz);
   });
 
-  // ── Center Goal — 4 uniform-width rectangular arms forming an X ──
-  const {cx: xcx, cy: xcy} = f2c(MID_X, MID_Y);
-  const armLen = MID_ARM * SCALE;
-  const armW   = armLen * 0.28;
+  // ── Neutral short Goals (grey squares, along mid-walls) ──
+  NEUTRAL_GOALS.forEach(g => {
+    const {cx, cy} = f2c(g.x, g.y);
+    const sz = GOAL_SIZE * SCALE * 0.85;
+    ctx.fillStyle = 'rgba(220,230,240,0.18)';
+    ctx.fillRect(cx-sz/2, cy-sz/2, sz, sz);
+    ctx.strokeStyle = 'rgba(220,230,255,0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx-sz/2, cy-sz/2, sz, sz);
+  });
 
-  ctx.fillStyle = 'rgba(220,230,240,0.2)';
-  ctx.strokeStyle = 'rgba(220,230,255,0.85)';
-  ctx.lineWidth = 1.5;
-
-  [-Math.PI*3/4, -Math.PI/4, Math.PI/4, Math.PI*3/4].forEach(a => {
-    ctx.save();
-    ctx.translate(xcx, xcy);
-    ctx.rotate(a);
+  // ── Tall neutral Goal — center of Midfield, drawn as a ringed circle ──
+  {
+    const {cx, cy} = f2c(TALL_GOAL.x, TALL_GOAL.y);
+    const r = GOAL_SIZE * SCALE * 0.6;
     ctx.beginPath();
-    ctx.rect(-armW/2, -armLen, armW, armLen);
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,209,102,0.18)';
     ctx.fill();
+    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    if (CSZ > 350) {
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = `600 ${Math.max(7,CSZ*0.012)}px DM Sans`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('TALL', cx, cy);
+    }
+  }
+
+  // ── Toggles — pink pill shapes centered on each wall ──
+  const TOG_LEN = Math.max(14, CSZ * 0.05);
+  const TOG_W   = Math.max(5, CSZ * 0.016);
+  TOGGLES.forEach(t => {
+    const {cx, cy} = f2c(t.x, t.y);
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (t.wall === 'top' || t.wall === 'bottom') {
+      // horizontal pill
+      ctx.beginPath();
+      ctx.roundRect(-TOG_LEN/2, -TOG_W/2, TOG_LEN, TOG_W, TOG_W/2);
+    } else {
+      // vertical pill
+      ctx.beginPath();
+      ctx.roundRect(-TOG_W/2, -TOG_LEN/2, TOG_W, TOG_LEN, TOG_W/2);
+    }
+    ctx.fillStyle = 'rgba(255,20,147,0.5)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,20,147,0.9)';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
   });
 
-  // Center hub
-  ctx.beginPath();
-  ctx.arc(xcx, xcy, armW * 0.55, 0, Math.PI*2);
-  ctx.fillStyle = 'rgba(220,230,255,0.35)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(220,230,255,0.8)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // ── Matchloader bumpers — half-circles on side walls ──
-  const ML_R = Math.max(7, CSZ * 0.025);
-  ML_CORNERS.forEach(ml => {
-    const {cy: dotY} = f2c(ml.x, ml.y);
-    const dotX = ml.wall === 'left' ? 0 : CSZ;
-    const startA = ml.wall === 'left' ? -Math.PI/2 : Math.PI/2;
-    const endA   = ml.wall === 'left' ?  Math.PI/2 : 3*Math.PI/2;
+  // ── Loaders — quarter-circle bumpers in each corner ──
+  const LD_R = Math.max(10, CSZ * 0.06);
+  LOADERS.forEach(l => {
+    const {cx, cy} = f2c(l.x, l.y);
+    let startA, endA;
+    if (l.corner === 'tl') { startA = 0; endA = Math.PI/2; }
+    else if (l.corner === 'tr') { startA = Math.PI/2; endA = Math.PI; }
+    else if (l.corner === 'br') { startA = Math.PI; endA = 3*Math.PI/2; }
+    else { startA = 3*Math.PI/2; endA = 2*Math.PI; }
     ctx.beginPath();
-    ctx.arc(dotX, dotY, ML_R, startA, endA);
-    ctx.fillStyle = 'rgba(220,230,255,0.8)';
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, LD_R, startA, endA);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(220,230,255,0.22)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
   });
@@ -673,19 +715,27 @@ function generateCode() {
   if (!out) return;
 
   const path=waypoints.slice(1);
-  stat.textContent=`${waypoints.length} waypoint${waypoints.length!==1?'s':''}`;
+  stat.textContent=`${waypoints.length} waypoint${waypoints.length!==1?'s':''} · ${fieldMode==='pid'?'PID':'Odom'}`;
 
   if (!waypoints.length) {
     out.innerHTML=s('cc','// No waypoints yet.\n// Click the field to start placing waypoints.');
     return;
   }
 
+  if (fieldMode==='odom') {
+    out.innerHTML = generateOdomCode(path).join('\n');
+  } else {
+    out.innerHTML = generatePidCode(path).join('\n');
+  }
+}
+
+// ── PID codegen — turn_set + drive_set per leg, heading tracked cumulatively ──
+function generatePidCode(path) {
   const L=[];
   L.push(s('cc','// Generated by Auton Planner — Syndicate'));
-  L.push(s('cc',`// Push Back 2025-26 | EZ-Template | ${path.length} move${path.length!==1?'s':''}`));
+  L.push(s('cc',`// Override 2026-27 | EZ-Template PID | ${path.length} move${path.length!==1?'s':''}`));
   L.push('');
 
-  // Start position actions
   if (waypoints[0]?.actions?.length) {
     L.push(s('cc','// — Start position'));
     waypoints[0].actions.forEach(a=>L.push(genA(a)));
@@ -712,7 +762,46 @@ function generateCode() {
     wp.actions?.forEach(a=>L.push(genA(a)));
     L.push('');
   }
-  out.innerHTML=L.join('\n');
+  return L;
+}
+
+// ── Odom codegen — same (x,y) waypoints, driven via EZ-Template's odom motion ──
+// Each leg is a single pid_odom_set call to the absolute field coordinate,
+// with heading computed toward that point (or toward the next point if you'd
+// rather arrive facing forward for the following leg — swap TARGET_NEXT_HEADING
+// below if you want that behavior instead).
+function generateOdomCode(path) {
+  const L=[];
+  L.push(s('cc','// Generated by Auton Planner — Syndicate'));
+  L.push(s('cc',`// Override 2026-27 | EZ-Template Odom | ${path.length} move${path.length!==1?'s':''}`));
+  L.push(s('cc','// Requires odom to be enabled + tracking wheels/IMU configured in your EZ-Template build'));
+  L.push('');
+
+  L.push(s('cf','chassis')+'.'+s('cf','odom_xyt_set')+'('+s('cn',waypoints[0].x.toFixed(2)+'_in')+', '+s('cn',waypoints[0].y.toFixed(2)+'_in')+', '+s('cn','0_deg')+');');
+  L.push(s('cc','// ^ sets starting field position — update the heading (0_deg) to match your real start angle'));
+  L.push('');
+
+  if (waypoints[0]?.actions?.length) {
+    L.push(s('cc','// — Start position'));
+    waypoints[0].actions.forEach(a=>L.push(genA(a)));
+    L.push('');
+  }
+
+  for (let i=1; i<waypoints.length; i++) {
+    const wp=waypoints[i], prev=waypoints[i-1];
+    const dx=wp.x-prev.x, dy=wp.y-prev.y;
+    const heading=(Math.atan2(dx,dy)*180/Math.PI).toFixed(1);
+    L.push(s('cc',`// — Waypoint ${i} (${wp.x.toFixed(1)}", ${wp.y.toFixed(1)}")`));
+    L.push(
+      s('cf','chassis')+'.'+s('cf','pid_odom_set')+'({{'+
+      s('cn',wp.x.toFixed(2)+'_in')+', '+s('cn',wp.y.toFixed(2)+'_in')+', '+s('cn',heading+'_deg')+'}, '+
+      s('cf',wp.speed)+'}, '+s('cf','TURN_SPEED')+');'
+    );
+    if (!wp.concurrent) L.push(s('cf','chassis')+'.'+s('cf','pid_wait')+'();');
+    wp.actions?.forEach(a=>L.push(genA(a)));
+    L.push('');
+  }
+  return L;
 }
 
 function genA(a) {
@@ -772,7 +861,8 @@ function switchTab(tab) {
 
 function setMode(m) {
   fieldMode=m;
-  document.querySelectorAll('.ftbtn').forEach((b,i)=>b.classList.toggle('on',['match','skills'][i]===m));
+  document.querySelectorAll('.ftbtn').forEach((b,i)=>b.classList.toggle('on',['pid','odom'][i]===m));
+  generateCode();
   draw();
 }
 
