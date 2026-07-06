@@ -186,76 +186,96 @@ canvas{display:block;cursor:crosshair;}
 </div>
 <script>
 // ══════════════════════════════════════════════════════
-// FIELD SPEC — Override 2026-27
+// FIELD SPEC — Override 2026-27 (traced from actual field photo)
 //
-// 12'x12' field (144in x 144in), same overall footprint as Push Back.
-// Layout is NOT a uniform 6x6 grid this season — the field is split by a
-// diagonal Autonomous Line into 4 Quadrants (one per Alliance Station
-// corner), with a diamond-shaped contested Midfield in the center.
-//
-// Canvas: origin top-left, Y increases downward.
-// Alliance Stations: Red = top-left & bottom-right corners (this build
-// assumes standard orientation — flip if your field is mirrored).
-//
-// NOTE: exact Appendix A dimensions weren't available to me — the
-// positions below are geometrically reasonable placements based on the
-// described layout (goals ~1 tile off each Alliance Station, toggles
-// centered on each wall, loaders in each corner). True these up against
-// your printed field or the manual PDF before trusting auton distances
-// to the inch.
+// Red alliance = LEFT side (top-left + bottom-left corners/robots)
+// Blue alliance = RIGHT side (top-right + bottom-right corners/robots)
+// Midfield is a square box centered on the field, sized to exactly
+// fill the middle 2x2 tiles. One straight diagonal line runs from
+// each field corner to the box's nearest corner and stops there.
 // ══════════════════════════════════════════════════════
 const TILE    = 24;
 const FTILES  = 6;
 const FIELD_IN = TILE * FTILES; // 144in
 const FIELD_MID = FIELD_IN / 2; // 72in
 
-// ── AUTONOMOUS LINE (diagonal, corner to corner) ──────
-// Splits the field into 4 Quadrants. Assumes the line runs from the
-// top-right corner to the bottom-left corner.
-const AUTON_LINE = [
-  { x: FIELD_IN, y: 0 },
-  { x: 0,        y: FIELD_IN },
+const CORNERS = {
+  tl: { x: 0,        y: 0        },
+  tr: { x: FIELD_IN, y: 0        },
+  bl: { x: 0,        y: FIELD_IN },
+  br: { x: FIELD_IN, y: FIELD_IN },
+};
+
+// ── MIDFIELD diamond — vertices at N/E/S/W, sized to fit exactly
+// inside the middle 2x2 tiles (touching their outer edges) ──
+const DIAMOND_R = TILE; // 24in center-to-vertex — vertices land right on
+                         // the boundary of the middle 2x2 tile block
+const MIDBOX_TIPS = {
+  n: { x: FIELD_MID,           y: FIELD_MID - DIAMOND_R },
+  e: { x: FIELD_MID + DIAMOND_R, y: FIELD_MID           },
+  s: { x: FIELD_MID,           y: FIELD_MID + DIAMOND_R },
+  w: { x: FIELD_MID - DIAMOND_R, y: FIELD_MID           },
+};
+
+// Straight 45° line from each field corner toward the exact center —
+// clipped at the MIDPOINT of the diamond's nearest edge (not its vertex,
+// since the diamond's vertices point N/E/S/W while the corner-to-center
+// lines run at 45°, they naturally cross an edge partway, not a tip).
+function mid(a,b) { return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
+const EDGE_MID = {
+  nw: mid(MIDBOX_TIPS.n, MIDBOX_TIPS.w),
+  ne: mid(MIDBOX_TIPS.n, MIDBOX_TIPS.e),
+  se: mid(MIDBOX_TIPS.s, MIDBOX_TIPS.e),
+  sw: mid(MIDBOX_TIPS.s, MIDBOX_TIPS.w),
+};
+
+// TL and BR are drawn as double (parallel) lines; TR and BL stay single
+const QUAD_LINES = [
+  { a: CORNERS.tl, b: EDGE_MID.nw, double: true  },
+  { a: CORNERS.tr, b: EDGE_MID.ne, double: false },
+  { a: CORNERS.br, b: EDGE_MID.se, double: true  },
+  { a: CORNERS.bl, b: EDGE_MID.sw, double: false },
 ];
 
-// ── MIDFIELD — contested diamond zone at field center ─
-const MIDFIELD_RADIUS = TILE * 1.15; // ~27.6in from center to each tip
+// ── GOALS — every goal is yellow/black, blue, or red ──
+// Tall neutral Goal — dead center of the Midfield diamond (yellow/black)
+const TALL_GOAL = { x: FIELD_MID, y: FIELD_MID };
 
-// ── GOALS ──────────────────────────────────────────────
-// 9 total: 4 Alliance goals (2 Red, 2 Blue) tucked near each Alliance
-// Station, 4 short neutral goals along the mid-walls, 1 tall neutral
-// goal dead-center (inside the Midfield diamond).
-const GOAL_SIZE = 13; // approx square footprint, inches
-
-const ALLIANCE_GOALS = [
-  { x: 1*TILE,          y: 1*TILE,          color: 'red'  }, // near top-left station
-  { x: FIELD_IN-1*TILE, y: FIELD_IN-1*TILE, color: 'red'  }, // near bottom-right station
-  { x: FIELD_IN-1*TILE, y: 1*TILE,          color: 'blue' }, // near top-right station
-  { x: 1*TILE,          y: FIELD_IN-1*TILE, color: 'blue' }, // near bottom-left station
+// Small alliance-colored goals sitting at each Midfield diamond tip
+const TIP_GOALS = [
+  { ...MIDBOX_TIPS.n, color: 'red'  },
+  { ...MIDBOX_TIPS.w, color: 'red'  },
+  { ...MIDBOX_TIPS.e, color: 'blue' },
+  { ...MIDBOX_TIPS.s, color: 'blue' },
 ];
 
-const NEUTRAL_GOALS = [
-  { x: FIELD_MID, y: 0.6*TILE },              // top mid-wall
-  { x: FIELD_MID, y: FIELD_IN - 0.6*TILE },   // bottom mid-wall
-  { x: 0.6*TILE,  y: FIELD_MID },             // left mid-wall
-  { x: FIELD_IN - 0.6*TILE, y: FIELD_MID },   // right mid-wall
+// Small yellow/black ring goals (Cups) — sit ON tile edges, not centers
+const RING_MARKERS = [
+  { x: 2.5*TILE, y: 1*TILE }, { x: 3.5*TILE, y: 1*TILE },
+  { x: 2.5*TILE, y: 5*TILE }, { x: 3.5*TILE, y: 5*TILE },
+  { x: 1*TILE, y: 2.5*TILE }, { x: 5*TILE, y: 2.5*TILE },
+  { x: 1*TILE, y: 3.5*TILE }, { x: 5*TILE, y: 3.5*TILE },
 ];
 
-const TALL_GOAL = { x: FIELD_MID, y: FIELD_MID }; // center of Midfield
+// ── MATCHLOADERS — open bracket, 2 straight segments, no fill ──
+// Using the field's own lettered/numbered tile grid (A-F left→right,
+// 1-6 top→bottom): for the TL corner, the tape runs from the edge of
+// tile A2, across to the halfway point between columns A/B (still on
+// row 2's midline), then up to the halfway point between A/B on row 1's
+// midline. Other 3 corners are the same shape, mirrored.
+const MATCHLOADERS = [
+  { color:'red',  segs: [ [[0,1.5*TILE],[1*TILE,1.5*TILE]], [[1*TILE,1.5*TILE],[1*TILE,0.5*TILE]] ] }, // TL (A2 edge → A/B mid row2 → A/B mid row1)
+  { color:'blue', segs: [ [[FIELD_IN,1.5*TILE],[FIELD_IN-1*TILE,1.5*TILE]], [[FIELD_IN-1*TILE,1.5*TILE],[FIELD_IN-1*TILE,0.5*TILE]] ] }, // TR (mirrored)
+  { color:'red',  segs: [ [[0,FIELD_IN-1.5*TILE],[1*TILE,FIELD_IN-1.5*TILE]], [[1*TILE,FIELD_IN-1.5*TILE],[1*TILE,FIELD_IN-0.5*TILE]] ] }, // BL (mirrored)
+  { color:'blue', segs: [ [[FIELD_IN,FIELD_IN-1.5*TILE],[FIELD_IN-1*TILE,FIELD_IN-1.5*TILE]], [[FIELD_IN-1*TILE,FIELD_IN-1.5*TILE],[FIELD_IN-1*TILE,FIELD_IN-0.5*TILE]] ] }, // BR (mirrored)
+];
 
-// ── TOGGLES — one centered on each of the 4 field walls ─
+// ── TOGGLES — centered on each of the 4 walls ─────────
 const TOGGLES = [
   { x: FIELD_MID, y: 0,         wall: 'top'    },
   { x: FIELD_MID, y: FIELD_IN,  wall: 'bottom' },
   { x: 0,         y: FIELD_MID, wall: 'left'   },
   { x: FIELD_IN,  y: FIELD_MID, wall: 'right'  },
-];
-
-// ── LOADERS — 2 per Alliance Station, one in each corner ─
-const LOADERS = [
-  { x: 0,        y: 0,        corner: 'tl' },
-  { x: FIELD_IN, y: 0,        corner: 'tr' },
-  { x: 0,        y: FIELD_IN, corner: 'bl' },
-  { x: FIELD_IN, y: FIELD_IN, corner: 'br' },
 ];
 
 // ══════════════════════════════════════════════════════
@@ -288,6 +308,8 @@ function resize() {
   CSZ = Math.max(280, s);
   SCALE = CSZ / FIELD_IN;
   cv.width = CSZ; cv.height = CSZ;
+  fieldCache.width = CSZ; fieldCache.height = CSZ;
+  renderFieldCache();
   draw();
 }
 window.addEventListener('resize', resize);
@@ -300,171 +322,139 @@ function c2f(cx, cy) { return { fx: cx/SCALE, fy: cy/SCALE }; }
 function txy(col, row) { return { x: (col-1)*TILE, y: (row-1)*TILE }; }
 
 // ══════════════════════════════════════════════════════
-// DRAW
+// FIELD CACHE — everything static (tiles, quadrant lines, diamond,
+// goals, toggles, corner dots, border) is drawn ONCE per resize onto
+// an offscreen canvas. draw() just blits this image + the dynamic
+// waypoints/path on top, every frame — this is what keeps dragging
+// smooth instead of redrawing 20+ shapes on every mousemove.
 // ══════════════════════════════════════════════════════
-function draw() {
-  ctx.clearRect(0,0,CSZ,CSZ);
-  ctx.shadowBlur = 0;
-  const ts = TILE * SCALE; // tile size in pixels
+const fieldCache = document.createElement('canvas');
+const fctx = fieldCache.getContext('2d');
 
-  // ── Tile backgrounds (still 6x6 grid for reference/coordinates) ──
+function renderFieldCache() {
+  const fx = fctx;
+  fx.clearRect(0,0,CSZ,CSZ);
+  const ts = TILE * SCALE;
+
+  // ── Tile backgrounds ──
   for (let ci=0; ci<6; ci++) {
     for (let ri=0; ri<6; ri++) {
-      const px = ci * ts, py = ri * ts;
-      ctx.fillStyle = (ci+ri)%2===0 ? '#1e2530' : '#1a2028';
-      ctx.fillRect(px, py, ts, ts);
+      fx.fillStyle = (ci+ri)%2===0 ? '#1e2530' : '#1a2028';
+      fx.fillRect(ci*ts, ri*ts, ts, ts);
     }
   }
-
   // ── Tile grid lines ──
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 1;
+  fx.strokeStyle = 'rgba(255,255,255,0.1)';
+  fx.lineWidth = 1;
   for (let i=0; i<=6; i++) {
     const p = i * ts;
-    ctx.beginPath(); ctx.moveTo(p,0); ctx.lineTo(p,CSZ); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(CSZ,p); ctx.stroke();
+    fx.beginPath(); fx.moveTo(p,0); fx.lineTo(p,CSZ); fx.stroke();
+    fx.beginPath(); fx.moveTo(0,p); fx.lineTo(CSZ,p); fx.stroke();
   }
 
-  // ── Quadrant shading (Red top-left/bottom-right, Blue top-right/bottom-left) ──
+  // ── Quadrant shading (Red = left side, Blue = right side) ──
   const half = CSZ/2;
-  ctx.save();
-  ctx.globalAlpha = 0.05;
-  ctx.fillStyle = '#ff4d6a';
-  ctx.fillRect(0,0,half,half);
-  ctx.fillRect(half,half,half,half);
-  ctx.fillStyle = '#3d9fff';
-  ctx.fillRect(half,0,half,half);
-  ctx.fillRect(0,half,half,half);
-  ctx.restore();
+  fx.save();
+  fx.globalAlpha = 0.045;
+  fx.fillStyle = '#ff4d6a';
+  fx.fillRect(0,0,half,half); fx.fillRect(0,half,half,half);
+  fx.fillStyle = '#3d9fff';
+  fx.fillRect(half,0,half,half); fx.fillRect(half,half,half,half);
+  fx.restore();
 
-  // ── Autonomous Line (diagonal, TR to BL) ──
-  {
-    const p1 = f2c(AUTON_LINE[0].x, AUTON_LINE[0].y);
-    const p2 = f2c(AUTON_LINE[1].x, AUTON_LINE[1].y);
-    ctx.strokeStyle = 'rgba(255,209,102,0.65)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([9,6]);
-    ctx.beginPath();
-    ctx.moveTo(p1.cx, p1.cy);
-    ctx.lineTo(p2.cx, p2.cy);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
+  // ── Quadrant diagonal lines — corner to center, clipped at the
+  // diamond's nearest edge midpoint. TL/BR are double, TR/BL single ──
+  fx.strokeStyle = 'rgba(255,255,255,0.75)';
+  QUAD_LINES.forEach(({a,b,double}) => {
+    const p1 = f2c(a.x, a.y), p2 = f2c(b.x, b.y);
+    if (!double) {
+      fx.lineWidth = 2;
+      fx.beginPath();
+      fx.moveTo(p1.cx, p1.cy);
+      fx.lineTo(p2.cx, p2.cy);
+      fx.stroke();
+    } else {
+      const dx = p2.cx-p1.cx, dy = p2.cy-p1.cy;
+      const len = Math.hypot(dx,dy) || 1;
+      const px = -dy/len, py = dx/len; // unit perpendicular
+      const off = Math.max(1.5, CSZ*0.004);
+      fx.lineWidth = 1.3;
+      [off,-off].forEach(o => {
+        fx.beginPath();
+        fx.moveTo(p1.cx+px*o, p1.cy+py*o);
+        fx.lineTo(p2.cx+px*o, p2.cy+py*o);
+        fx.stroke();
+      });
+    }
+  });
 
-  // ── Midfield — contested diamond at center ──
+  // ── Midfield diamond — vertices N/E/S/W, fits inside the middle 2x2 tiles ──
   {
-    const {cx, cy} = f2c(FIELD_MID, FIELD_MID);
-    const r = MIDFIELD_RADIUS * SCALE;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy-r);
-    ctx.lineTo(cx+r, cy);
-    ctx.lineTo(cx, cy+r);
-    ctx.lineTo(cx-r, cy);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    const N=f2c(MIDBOX_TIPS.n.x,MIDBOX_TIPS.n.y), E=f2c(MIDBOX_TIPS.e.x,MIDBOX_TIPS.e.y),
+          S=f2c(MIDBOX_TIPS.s.x,MIDBOX_TIPS.s.y), W=f2c(MIDBOX_TIPS.w.x,MIDBOX_TIPS.w.y);
+    fx.beginPath();
+    fx.moveTo(N.cx,N.cy); fx.lineTo(E.cx,E.cy); fx.lineTo(S.cx,S.cy); fx.lineTo(W.cx,W.cy);
+    fx.closePath();
+    fx.fillStyle = 'rgba(255,255,255,0.06)';
+    fx.fill();
+    fx.strokeStyle = 'rgba(255,255,255,0.45)';
+    fx.lineWidth = 2;
+    fx.stroke();
     if (CSZ > 350) {
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.font = `600 ${Math.max(7,CSZ*0.017)}px DM Sans`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('MIDFIELD', cx, cy - r - 10);
+      fx.fillStyle = 'rgba(255,255,255,0.4)';
+      fx.font = `600 ${Math.max(7,CSZ*0.016)}px DM Sans`;
+      fx.textAlign='center'; fx.textBaseline='middle';
+      fx.fillText('MIDFIELD', N.cx, N.cy - 10);
     }
   }
 
-  // ── Alliance Goals (small squares, red/blue outline) ──
-  ALLIANCE_GOALS.forEach(g => {
-    const {cx, cy} = f2c(g.x, g.y);
-    const sz = GOAL_SIZE * SCALE;
-    const col = g.color === 'red' ? 'rgba(255,77,106,0.9)' : 'rgba(61,159,255,0.9)';
-    const fillCol = g.color === 'red' ? 'rgba(255,77,106,0.18)' : 'rgba(61,159,255,0.18)';
-    ctx.fillStyle = fillCol;
-    ctx.fillRect(cx-sz/2, cy-sz/2, sz, sz);
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cx-sz/2, cy-sz/2, sz, sz);
+  // ── Goals — removed for now, will re-add later ──
+
+  // ── Matchloaders — open bracket, 2 straight line segments, not rotated ──
+  MATCHLOADERS.forEach(m => {
+    const col = m.color==='red' ? 'rgba(255,20,60,0.95)' : 'rgba(20,150,255,0.95)';
+    fx.strokeStyle = col;
+    fx.lineWidth = 2.5;
+    m.segs.forEach(([[x1,y1],[x2,y2]]) => {
+      const p1 = f2c(x1,y1), p2 = f2c(x2,y2);
+      fx.beginPath();
+      fx.moveTo(p1.cx, p1.cy);
+      fx.lineTo(p2.cx, p2.cy);
+      fx.stroke();
+    });
   });
 
-  // ── Neutral short Goals (grey squares, along mid-walls) ──
-  NEUTRAL_GOALS.forEach(g => {
-    const {cx, cy} = f2c(g.x, g.y);
-    const sz = GOAL_SIZE * SCALE * 0.85;
-    ctx.fillStyle = 'rgba(220,230,240,0.18)';
-    ctx.fillRect(cx-sz/2, cy-sz/2, sz, sz);
-    ctx.strokeStyle = 'rgba(220,230,255,0.75)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(cx-sz/2, cy-sz/2, sz, sz);
-  });
-
-  // ── Tall neutral Goal — center of Midfield, drawn as a ringed circle ──
-  {
-    const {cx, cy} = f2c(TALL_GOAL.x, TALL_GOAL.y);
-    const r = GOAL_SIZE * SCALE * 0.6;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(255,209,102,0.18)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    if (CSZ > 350) {
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.font = `600 ${Math.max(7,CSZ*0.012)}px DM Sans`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('TALL', cx, cy);
-    }
-  }
-
-  // ── Toggles — pink pill shapes centered on each wall ──
-  const TOG_LEN = Math.max(14, CSZ * 0.05);
+  // ── Toggles — longer pill shapes centered on each wall ──
+  const TOG_LEN = Math.max(32, CSZ * 0.15);
   const TOG_W   = Math.max(5, CSZ * 0.016);
   TOGGLES.forEach(t => {
     const {cx, cy} = f2c(t.x, t.y);
-    ctx.save();
-    ctx.translate(cx, cy);
-    if (t.wall === 'top' || t.wall === 'bottom') {
-      // horizontal pill
-      ctx.beginPath();
-      ctx.roundRect(-TOG_LEN/2, -TOG_W/2, TOG_LEN, TOG_W, TOG_W/2);
-    } else {
-      // vertical pill
-      ctx.beginPath();
-      ctx.roundRect(-TOG_W/2, -TOG_LEN/2, TOG_W, TOG_LEN, TOG_W/2);
-    }
-    ctx.fillStyle = 'rgba(255,20,147,0.5)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,20,147,0.9)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.restore();
-  });
-
-  // ── Loaders — quarter-circle bumpers in each corner ──
-  const LD_R = Math.max(10, CSZ * 0.06);
-  LOADERS.forEach(l => {
-    const {cx, cy} = f2c(l.x, l.y);
-    let startA, endA;
-    if (l.corner === 'tl') { startA = 0; endA = Math.PI/2; }
-    else if (l.corner === 'tr') { startA = Math.PI/2; endA = Math.PI; }
-    else if (l.corner === 'br') { startA = Math.PI; endA = 3*Math.PI/2; }
-    else { startA = 3*Math.PI/2; endA = 2*Math.PI; }
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, LD_R, startA, endA);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(220,230,255,0.22)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    fx.save();
+    fx.translate(cx, cy);
+    fx.beginPath();
+    if (t.wall === 'top' || t.wall === 'bottom') fx.roundRect(-TOG_LEN/2, -TOG_W/2, TOG_LEN, TOG_W, TOG_W/2);
+    else fx.roundRect(-TOG_W/2, -TOG_LEN/2, TOG_W, TOG_LEN, TOG_W/2);
+    fx.fillStyle = 'rgba(255,209,102,0.55)';
+    fx.fill();
+    fx.strokeStyle = 'rgba(255,209,102,0.95)';
+    fx.lineWidth = 1.5;
+    fx.stroke();
+    fx.restore();
   });
 
   // ── Field border ──
-  ctx.strokeStyle = 'rgba(0,212,232,0.4)';
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(1,1,CSZ-2,CSZ-2);
+  fx.strokeStyle = 'rgba(0,212,232,0.4)';
+  fx.lineWidth = 2.5;
+  fx.strokeRect(1,1,CSZ-2,CSZ-2);
+}
+
+// ══════════════════════════════════════════════════════
+// DRAW — runs every frame (including every drag mousemove).
+// Blits the cached static field, then draws only the dynamic bits.
+// ══════════════════════════════════════════════════════
+function draw() {
+  ctx.clearRect(0,0,CSZ,CSZ);
+  ctx.drawImage(fieldCache, 0, 0);
 
   // ── PATH ──
   if (waypoints.length > 1) {
