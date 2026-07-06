@@ -229,12 +229,32 @@ const EDGE_MID = {
   sw: mid(MIDBOX_TIPS.s, MIDBOX_TIPS.w),
 };
 
+// ── MATCHLOADERS — 3-segment bracket, no fill. Path (TL example):
+// start at corner A1, go down the wall to A2, right half a tile,
+// then up to the top wall. Other 3 corners mirror this shape.
+const MATCHLOADERS = [
+  { color:'red',  segs: [ [[0,0],[0,1*TILE]], [[0,1*TILE],[0.5*TILE,1*TILE]], [[0.5*TILE,1*TILE],[0.5*TILE,0]] ] }, // TL
+  { color:'blue', segs: [ [[FIELD_IN,0],[FIELD_IN,1*TILE]], [[FIELD_IN,1*TILE],[FIELD_IN-0.5*TILE,1*TILE]], [[FIELD_IN-0.5*TILE,1*TILE],[FIELD_IN-0.5*TILE,0]] ] }, // TR
+  { color:'red',  segs: [ [[0,FIELD_IN],[0,FIELD_IN-1*TILE]], [[0,FIELD_IN-1*TILE],[0.5*TILE,FIELD_IN-1*TILE]], [[0.5*TILE,FIELD_IN-1*TILE],[0.5*TILE,FIELD_IN]] ] }, // BL
+  { color:'blue', segs: [ [[FIELD_IN,FIELD_IN],[FIELD_IN,FIELD_IN-1*TILE]], [[FIELD_IN,FIELD_IN-1*TILE],[FIELD_IN-0.5*TILE,FIELD_IN-1*TILE]], [[FIELD_IN-0.5*TILE,FIELD_IN-1*TILE],[FIELD_IN-0.5*TILE,FIELD_IN]] ] }, // BR
+];
+
+// Quadrant lines now start where the 45° corner-to-center line exits the
+// matchload zone (a half-tile-wide strip along the wall), not at the
+// corner itself — i.e. at (12,12) instead of (0,0) for TL, etc.
+const LINE_START = {
+  tl: { x: 0.5*TILE, y: 0.5*TILE },
+  tr: { x: FIELD_IN-0.5*TILE, y: 0.5*TILE },
+  bl: { x: 0.5*TILE, y: FIELD_IN-0.5*TILE },
+  br: { x: FIELD_IN-0.5*TILE, y: FIELD_IN-0.5*TILE },
+};
+
 // TL and BR are drawn as double (parallel) lines; TR and BL stay single
 const QUAD_LINES = [
-  { a: CORNERS.tl, b: EDGE_MID.nw, double: true  },
-  { a: CORNERS.tr, b: EDGE_MID.ne, double: false },
-  { a: CORNERS.br, b: EDGE_MID.se, double: true  },
-  { a: CORNERS.bl, b: EDGE_MID.sw, double: false },
+  { a: LINE_START.tl, b: EDGE_MID.nw, double: true  },
+  { a: LINE_START.tr, b: EDGE_MID.ne, double: false },
+  { a: LINE_START.br, b: EDGE_MID.se, double: true  },
+  { a: LINE_START.bl, b: EDGE_MID.sw, double: false },
 ];
 
 // ── GOALS — every goal is yellow/black, blue, or red ──
@@ -255,19 +275,6 @@ const RING_MARKERS = [
   { x: 2.5*TILE, y: 5*TILE }, { x: 3.5*TILE, y: 5*TILE },
   { x: 1*TILE, y: 2.5*TILE }, { x: 5*TILE, y: 2.5*TILE },
   { x: 1*TILE, y: 3.5*TILE }, { x: 5*TILE, y: 3.5*TILE },
-];
-
-// ── MATCHLOADERS — open bracket, 2 straight segments, no fill ──
-// Using the field's own lettered/numbered tile grid (A-F left→right,
-// 1-6 top→bottom): for the TL corner, the tape runs from the edge of
-// tile A2, across to the halfway point between columns A/B (still on
-// row 2's midline), then up to the halfway point between A/B on row 1's
-// midline. Other 3 corners are the same shape, mirrored.
-const MATCHLOADERS = [
-  { color:'red',  segs: [ [[0,1.5*TILE],[1*TILE,1.5*TILE]], [[1*TILE,1.5*TILE],[1*TILE,0.5*TILE]] ] }, // TL (A2 edge → A/B mid row2 → A/B mid row1)
-  { color:'blue', segs: [ [[FIELD_IN,1.5*TILE],[FIELD_IN-1*TILE,1.5*TILE]], [[FIELD_IN-1*TILE,1.5*TILE],[FIELD_IN-1*TILE,0.5*TILE]] ] }, // TR (mirrored)
-  { color:'red',  segs: [ [[0,FIELD_IN-1.5*TILE],[1*TILE,FIELD_IN-1.5*TILE]], [[1*TILE,FIELD_IN-1.5*TILE],[1*TILE,FIELD_IN-0.5*TILE]] ] }, // BL (mirrored)
-  { color:'blue', segs: [ [[FIELD_IN,FIELD_IN-1.5*TILE],[FIELD_IN-1*TILE,FIELD_IN-1.5*TILE]], [[FIELD_IN-1*TILE,FIELD_IN-1.5*TILE],[FIELD_IN-1*TILE,FIELD_IN-0.5*TILE]] ] }, // BR (mirrored)
 ];
 
 // ── TOGGLES — centered on each of the 4 walls ─────────
