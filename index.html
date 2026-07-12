@@ -257,24 +257,20 @@ const QUAD_LINES = [
   { a: LINE_START.bl, b: EDGE_MID.sw, double: false },
 ];
 
-// ── GOALS — every goal is yellow/black, blue, or red ──
-// Tall neutral Goal — dead center of the Midfield diamond (yellow/black)
-const TALL_GOAL = { x: FIELD_MID, y: FIELD_MID };
-
-// Small alliance-colored goals sitting at each Midfield diamond tip
-const TIP_GOALS = [
-  { ...MIDBOX_TIPS.n, color: 'red'  },
-  { ...MIDBOX_TIPS.w, color: 'red'  },
-  { ...MIDBOX_TIPS.e, color: 'blue' },
-  { ...MIDBOX_TIPS.s, color: 'blue' },
-];
-
-// Small yellow/black ring goals (Cups) — sit ON tile edges, not centers
-const RING_MARKERS = [
-  { x: 2.5*TILE, y: 1*TILE }, { x: 3.5*TILE, y: 1*TILE },
-  { x: 2.5*TILE, y: 5*TILE }, { x: 3.5*TILE, y: 5*TILE },
-  { x: 1*TILE, y: 2.5*TILE }, { x: 5*TILE, y: 2.5*TILE },
-  { x: 1*TILE, y: 3.5*TILE }, { x: 5*TILE, y: 3.5*TILE },
+// ── GOALS — measured from the rotated (-90°) reference diagram and
+// converted back into this field's coordinate frame. Every goal is a
+// rounded square with a circle inset in the middle, colored black
+// (neutral), blue, or red. All sit on grid-line intersections.
+const GOALS = [
+  { x: 72,  y: 72,  color: 'black' }, // dead center
+  { x: 120, y: 48,  color: 'blue'  }, // near TR corner
+  { x: 96,  y: 24,  color: 'blue'  }, // near TR corner
+  { x: 48,  y: 120, color: 'red'   }, // near BL corner
+  { x: 24,  y: 96,  color: 'red'   }, // near BL corner
+  { x: 120, y: 96,  color: 'black' }, // near BR corner
+  { x: 96,  y: 120, color: 'black' }, // near BR corner
+  { x: 48,  y: 24,  color: 'black' }, // near TL corner
+  { x: 24,  y: 48,  color: 'black' }, // near TL corner
 ];
 
 // ── TOGGLES — centered on each of the 4 walls ─────────
@@ -415,7 +411,29 @@ function renderFieldCache() {
     }
   }
 
-  // ── Goals — removed for now, will re-add later ──
+  // ── Goals — rounded square with a circle inset in the middle ──
+  const GOAL_SIZE = Math.max(10, CSZ*0.045);
+  const GOAL_R = GOAL_SIZE * 0.14;
+  const GOAL_HOLE = GOAL_SIZE * 0.32;
+  const GOAL_FILL = {
+    black: 'rgba(20,22,28,0.95)',
+    blue:  'rgba(61,159,255,0.95)',
+    red:   'rgba(255,20,60,0.95)',
+  };
+  GOALS.forEach(g => {
+    const {cx, cy} = f2c(g.x, g.y);
+    fx.beginPath();
+    fx.roundRect(cx-GOAL_SIZE/2, cy-GOAL_SIZE/2, GOAL_SIZE, GOAL_SIZE, GOAL_R);
+    fx.fillStyle = GOAL_FILL[g.color];
+    fx.fill();
+    fx.strokeStyle = 'rgba(255,255,255,0.35)';
+    fx.lineWidth = 1;
+    fx.stroke();
+    fx.beginPath();
+    fx.arc(cx, cy, GOAL_HOLE/2, 0, Math.PI*2);
+    fx.fillStyle = 'rgba(235,238,242,0.9)';
+    fx.fill();
+  });
 
   // ── Matchloaders — open bracket, 2 straight line segments, not rotated ──
   MATCHLOADERS.forEach(m => {
